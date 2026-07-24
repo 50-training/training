@@ -6,7 +6,15 @@ using OrderHub.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews(options =>
+{
+    // 讓 model binding 的型別轉換失敗改顯示繁中，而非框架英文預設：
+    // int 欄位收到非數字走 AttemptedValueIsInvalid；空字串綁到非可空 int 走 ValueMustNotBeNull；decimal/浮點欄位走 ValueMustBeANumber。
+    var messages = options.ModelBindingMessageProvider;
+    messages.SetAttemptedValueIsInvalidAccessor((value, field) => $"輸入的值「{value}」無效");
+    messages.SetValueMustNotBeNullAccessor(value => "輸入的值無效");
+    messages.SetValueMustBeANumberAccessor(field => "此欄位必須是數字");
+});
 
 builder.Services.AddDbContext<OrderHubDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("Default")));

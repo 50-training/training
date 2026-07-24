@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using OrderHub.Core.Common;
 using OrderHub.Core.Domain;
 using OrderHub.Core.Interfaces;
+using OrderHub.Core.Services;
 using OrderHub.Infrastructure.Data;
 
 namespace OrderHub.Infrastructure.Repositories;
@@ -55,6 +56,16 @@ public class OrderRepository : IOrderRepository
             .Include(o => o.Items)
             .Where(o => o.CustomerId == customerId)
             .OrderByDescending(o => o.CreatedAt)
+            .ToListAsync();
+
+    public async Task<IReadOnlyList<ProductSales>> GetUnitsSoldByProductSinceAsync(
+        DateTime since, IReadOnlyCollection<int> productIds) =>
+        await _db.OrderItems
+            .Where(i => i.Order!.Status != OrderStatus.Cancelled
+                     && i.Order.CreatedAt >= since
+                     && productIds.Contains(i.ProductId))
+            .GroupBy(i => i.ProductId)
+            .Select(g => new ProductSales(g.Key, g.Sum(x => x.Quantity)))
             .ToListAsync();
 
     public async Task AddAsync(Order order) => await _db.Orders.AddAsync(order);
