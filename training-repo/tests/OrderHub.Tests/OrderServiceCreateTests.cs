@@ -37,6 +37,27 @@ public class OrderServiceCreateTests
     }
 
     [Fact]
+    public async Task CreateOrder_GoldCustomer_SnapshotsRawUnitPrice_AndDiscountsOnce()
+    {
+        using var db = TestSetup.CreateContext();
+        var service = TestSetup.CreateOrderService(db);
+        var customer = TestSetup.AddCustomer(db, tier: CustomerTier.Gold);
+        var product = TestSetup.AddProduct(db, unitPrice: 1000m);
+
+        var result = await service.CreateOrderAsync(customer.Id, new[] { new NewOrderLine(product.Id, 1) });
+
+        Assert.True(result.Success);
+
+        // 單價快照應存原價，不可在建單時先為金卡打折（修復前會是 900）。
+        Assert.Equal(1000m, result.Value!.Items.Single().UnitPriceSnapshot);
+
+        // 明細頁會帶入 Customer 導覽屬性（GetWithDetailsAsync 有 Include Customer）；
+        // 金卡折扣只應在計算總額時套一次：1000 × (1 - 0.10) = 900（修復前雙重折扣為 810）。
+        result.Value.Customer = customer;
+        Assert.Equal(900m, service.CalculateTotal(result.Value));
+    }
+
+    [Fact]
     public async Task CreateOrder_DecrementsProductStock()
     {
         using var db = TestSetup.CreateContext();
