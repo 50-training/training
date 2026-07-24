@@ -1,16 +1,17 @@
+using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 using Microsoft.EntityFrameworkCore;
 using OrderHub.Core.Interfaces;
 using OrderHub.Core.Services;
 using OrderHub.Infrastructure.Data;
 using OrderHub.Infrastructure.Repositories;
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews(options =>
 {
     // 讓 model binding 的型別轉換失敗改顯示繁中，而非框架英文預設：
     // int 欄位收到非數字走 AttemptedValueIsInvalid；空字串綁到非可空 int 走 ValueMustNotBeNull；decimal/浮點欄位走 ValueMustBeANumber。
-    var messages = options.ModelBindingMessageProvider;
+    DefaultModelBindingMessageProvider messages = options.ModelBindingMessageProvider;
     messages.SetAttemptedValueIsInvalidAccessor((value, field) => $"輸入的值「{value}」無效");
     messages.SetValueMustNotBeNullAccessor(value => "輸入的值無效");
     messages.SetValueMustBeANumberAccessor(field => "此欄位必須是數字");
@@ -27,12 +28,12 @@ builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
 // 啟動時自動套用 migration 並植入種子資料，開發人員不需手動建庫。
-using (var scope = app.Services.CreateScope())
+using (IServiceScope scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<OrderHubDbContext>();
+    OrderHubDbContext db = scope.ServiceProvider.GetRequiredService<OrderHubDbContext>();
     db.Database.Migrate();
     await DbSeeder.SeedAsync(db);
 }

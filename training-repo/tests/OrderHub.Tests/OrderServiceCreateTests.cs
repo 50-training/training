@@ -1,5 +1,7 @@
+using OrderHub.Core.Common;
 using OrderHub.Core.Domain;
 using OrderHub.Core.Services;
+using OrderHub.Infrastructure.Data;
 
 namespace OrderHub.Tests;
 
@@ -8,12 +10,12 @@ public class OrderServiceCreateTests
     [Fact]
     public async Task CreateOrder_HappyPath_CreatesPendingOrder()
     {
-        using var db = TestSetup.CreateContext();
-        var service = TestSetup.CreateOrderService(db);
-        var customer = TestSetup.AddCustomer(db);
-        var product = TestSetup.AddProduct(db);
+        using OrderHubDbContext db = TestSetup.CreateContext();
+        OrderService service = TestSetup.CreateOrderService(db);
+        Customer customer = TestSetup.AddCustomer(db);
+        Product product = TestSetup.AddProduct(db);
 
-        var result = await service.CreateOrderAsync(customer.Id, new[] { new NewOrderLine(product.Id, 2) });
+        ServiceResult<Order> result = await service.CreateOrderAsync(customer.Id, new[] { new NewOrderLine(product.Id, 2) });
 
         Assert.True(result.Success);
         Assert.NotNull(result.Value);
@@ -25,12 +27,12 @@ public class OrderServiceCreateTests
     [Fact]
     public async Task CreateOrder_SnapshotsCurrentUnitPrice()
     {
-        using var db = TestSetup.CreateContext();
-        var service = TestSetup.CreateOrderService(db);
-        var customer = TestSetup.AddCustomer(db);
-        var product = TestSetup.AddProduct(db, unitPrice: 380m);
+        using OrderHubDbContext db = TestSetup.CreateContext();
+        OrderService service = TestSetup.CreateOrderService(db);
+        Customer customer = TestSetup.AddCustomer(db);
+        Product product = TestSetup.AddProduct(db, unitPrice: 380m);
 
-        var result = await service.CreateOrderAsync(customer.Id, new[] { new NewOrderLine(product.Id, 1) });
+        ServiceResult<Order> result = await service.CreateOrderAsync(customer.Id, new[] { new NewOrderLine(product.Id, 1) });
 
         Assert.True(result.Success);
         Assert.Equal(380m, result.Value!.Items.Single().UnitPriceSnapshot);
@@ -39,12 +41,12 @@ public class OrderServiceCreateTests
     [Fact]
     public async Task CreateOrder_GoldCustomer_SnapshotsRawUnitPrice_AndDiscountsOnce()
     {
-        using var db = TestSetup.CreateContext();
-        var service = TestSetup.CreateOrderService(db);
-        var customer = TestSetup.AddCustomer(db, tier: CustomerTier.Gold);
-        var product = TestSetup.AddProduct(db, unitPrice: 1000m);
+        using OrderHubDbContext db = TestSetup.CreateContext();
+        OrderService service = TestSetup.CreateOrderService(db);
+        Customer customer = TestSetup.AddCustomer(db, tier: CustomerTier.Gold);
+        Product product = TestSetup.AddProduct(db, unitPrice: 1000m);
 
-        var result = await service.CreateOrderAsync(customer.Id, new[] { new NewOrderLine(product.Id, 1) });
+        ServiceResult<Order> result = await service.CreateOrderAsync(customer.Id, new[] { new NewOrderLine(product.Id, 1) });
 
         Assert.True(result.Success);
 
@@ -60,12 +62,12 @@ public class OrderServiceCreateTests
     [Fact]
     public async Task CreateOrder_DecrementsProductStock()
     {
-        using var db = TestSetup.CreateContext();
-        var service = TestSetup.CreateOrderService(db);
-        var customer = TestSetup.AddCustomer(db);
-        var product = TestSetup.AddProduct(db, stock: 10);
+        using OrderHubDbContext db = TestSetup.CreateContext();
+        OrderService service = TestSetup.CreateOrderService(db);
+        Customer customer = TestSetup.AddCustomer(db);
+        Product product = TestSetup.AddProduct(db, stock: 10);
 
-        var result = await service.CreateOrderAsync(customer.Id, new[] { new NewOrderLine(product.Id, 3) });
+        ServiceResult<Order> result = await service.CreateOrderAsync(customer.Id, new[] { new NewOrderLine(product.Id, 3) });
 
         Assert.True(result.Success);
         Assert.Equal(7, db.Products.Single(p => p.Id == product.Id).StockQuantity);
@@ -74,11 +76,11 @@ public class OrderServiceCreateTests
     [Fact]
     public async Task CreateOrder_UnknownCustomer_Fails()
     {
-        using var db = TestSetup.CreateContext();
-        var service = TestSetup.CreateOrderService(db);
-        var product = TestSetup.AddProduct(db);
+        using OrderHubDbContext db = TestSetup.CreateContext();
+        OrderService service = TestSetup.CreateOrderService(db);
+        Product product = TestSetup.AddProduct(db);
 
-        var result = await service.CreateOrderAsync(999, new[] { new NewOrderLine(product.Id, 1) });
+        ServiceResult<Order> result = await service.CreateOrderAsync(999, new[] { new NewOrderLine(product.Id, 1) });
 
         Assert.False(result.Success);
         Assert.Contains("客戶", result.ErrorMessage);
@@ -87,11 +89,11 @@ public class OrderServiceCreateTests
     [Fact]
     public async Task CreateOrder_EmptyLines_Fails()
     {
-        using var db = TestSetup.CreateContext();
-        var service = TestSetup.CreateOrderService(db);
-        var customer = TestSetup.AddCustomer(db);
+        using OrderHubDbContext db = TestSetup.CreateContext();
+        OrderService service = TestSetup.CreateOrderService(db);
+        Customer customer = TestSetup.AddCustomer(db);
 
-        var result = await service.CreateOrderAsync(customer.Id, Array.Empty<NewOrderLine>());
+        ServiceResult<Order> result = await service.CreateOrderAsync(customer.Id, Array.Empty<NewOrderLine>());
 
         Assert.False(result.Success);
     }
@@ -99,12 +101,12 @@ public class OrderServiceCreateTests
     [Fact]
     public async Task CreateOrder_NonPositiveQuantity_Fails()
     {
-        using var db = TestSetup.CreateContext();
-        var service = TestSetup.CreateOrderService(db);
-        var customer = TestSetup.AddCustomer(db);
-        var product = TestSetup.AddProduct(db);
+        using OrderHubDbContext db = TestSetup.CreateContext();
+        OrderService service = TestSetup.CreateOrderService(db);
+        Customer customer = TestSetup.AddCustomer(db);
+        Product product = TestSetup.AddProduct(db);
 
-        var result = await service.CreateOrderAsync(customer.Id, new[] { new NewOrderLine(product.Id, 0) });
+        ServiceResult<Order> result = await service.CreateOrderAsync(customer.Id, new[] { new NewOrderLine(product.Id, 0) });
 
         Assert.False(result.Success);
     }
@@ -112,12 +114,12 @@ public class OrderServiceCreateTests
     [Fact]
     public async Task CreateOrder_DuplicateProduct_Fails()
     {
-        using var db = TestSetup.CreateContext();
-        var service = TestSetup.CreateOrderService(db);
-        var customer = TestSetup.AddCustomer(db);
-        var product = TestSetup.AddProduct(db);
+        using OrderHubDbContext db = TestSetup.CreateContext();
+        OrderService service = TestSetup.CreateOrderService(db);
+        Customer customer = TestSetup.AddCustomer(db);
+        Product product = TestSetup.AddProduct(db);
 
-        var result = await service.CreateOrderAsync(customer.Id, new[]
+        ServiceResult<Order> result = await service.CreateOrderAsync(customer.Id, new[]
         {
             new NewOrderLine(product.Id, 1),
             new NewOrderLine(product.Id, 2)
@@ -129,12 +131,12 @@ public class OrderServiceCreateTests
     [Fact]
     public async Task CreateOrder_InactiveProduct_Fails()
     {
-        using var db = TestSetup.CreateContext();
-        var service = TestSetup.CreateOrderService(db);
-        var customer = TestSetup.AddCustomer(db);
-        var product = TestSetup.AddProduct(db, isActive: false);
+        using OrderHubDbContext db = TestSetup.CreateContext();
+        OrderService service = TestSetup.CreateOrderService(db);
+        Customer customer = TestSetup.AddCustomer(db);
+        Product product = TestSetup.AddProduct(db, isActive: false);
 
-        var result = await service.CreateOrderAsync(customer.Id, new[] { new NewOrderLine(product.Id, 1) });
+        ServiceResult<Order> result = await service.CreateOrderAsync(customer.Id, new[] { new NewOrderLine(product.Id, 1) });
 
         Assert.False(result.Success);
     }
@@ -142,12 +144,12 @@ public class OrderServiceCreateTests
     [Fact]
     public async Task CreateOrder_InsufficientStock_FailsWithMessage()
     {
-        using var db = TestSetup.CreateContext();
-        var service = TestSetup.CreateOrderService(db);
-        var customer = TestSetup.AddCustomer(db);
-        var product = TestSetup.AddProduct(db, stock: 2);
+        using OrderHubDbContext db = TestSetup.CreateContext();
+        OrderService service = TestSetup.CreateOrderService(db);
+        Customer customer = TestSetup.AddCustomer(db);
+        Product product = TestSetup.AddProduct(db, stock: 2);
 
-        var result = await service.CreateOrderAsync(customer.Id, new[] { new NewOrderLine(product.Id, 5) });
+        ServiceResult<Order> result = await service.CreateOrderAsync(customer.Id, new[] { new NewOrderLine(product.Id, 5) });
 
         Assert.False(result.Success);
         Assert.Contains("庫存不足", result.ErrorMessage);
@@ -156,10 +158,10 @@ public class OrderServiceCreateTests
     [Fact]
     public async Task CreateOrder_Failed_DoesNotPersistOrder()
     {
-        using var db = TestSetup.CreateContext();
-        var service = TestSetup.CreateOrderService(db);
-        var customer = TestSetup.AddCustomer(db);
-        var product = TestSetup.AddProduct(db, stock: 2);
+        using OrderHubDbContext db = TestSetup.CreateContext();
+        OrderService service = TestSetup.CreateOrderService(db);
+        Customer customer = TestSetup.AddCustomer(db);
+        Product product = TestSetup.AddProduct(db, stock: 2);
 
         await service.CreateOrderAsync(customer.Id, new[] { new NewOrderLine(product.Id, 5) });
 

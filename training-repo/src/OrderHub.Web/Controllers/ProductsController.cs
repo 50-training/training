@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using OrderHub.Core.Domain;
 using OrderHub.Core.Services;
 using OrderHub.Web.ViewModels;
 
@@ -15,9 +16,9 @@ public class ProductsController : Controller
 
     public async Task<IActionResult> Index()
     {
-        var products = await _productService.GetAllAsync();
+        IReadOnlyList<Product> products = await _productService.GetAllAsync();
 
-        var vm = new ProductListViewModel
+        ProductListViewModel vm = new ProductListViewModel
         {
             Products = products.Select(p => new ProductRowViewModel
             {
@@ -36,9 +37,11 @@ public class ProductsController : Controller
     public async Task<IActionResult> LowStock(LowStockViewModel vm)
     {
         if (!ModelState.IsValid)
+        {
             return View(vm);
+        }
 
-        var items = await _productService.GetLowStockAsync(vm.Threshold);
+        IReadOnlyList<LowStockItem> items = await _productService.GetLowStockAsync(vm.Threshold);
         vm.Products = items.Select(i => new LowStockRowViewModel
         {
             Sku = i.Sku,
@@ -50,4 +53,3 @@ public class ProductsController : Controller
         return View(vm);
     }
 }
-

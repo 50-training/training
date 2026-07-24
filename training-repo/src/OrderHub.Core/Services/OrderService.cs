@@ -22,8 +22,16 @@ public class OrderService : IOrderService
 
     public Task<PagedResult<Order>> GetOrdersAsync(int page, int pageSize, OrderStatus? status)
     {
-        if (page < 1) page = 1;
-        if (pageSize < 1) pageSize = 20;
+        if (page < 1)
+        {
+            page = 1;
+        }
+
+        if (pageSize < 1)
+        {
+            pageSize = 20;
+        }
+
         return _orderRepository.GetPagedAsync(page, pageSize, status);
     }
 
@@ -34,27 +42,31 @@ public class OrderService : IOrderService
 
     public async Task<ServiceResult<Order>> CreateOrderAsync(int customerId, IReadOnlyList<NewOrderLine> lines)
     {
-        var customer = await _customerRepository.GetByIdAsync(customerId);
+        Customer? customer = await _customerRepository.GetByIdAsync(customerId);
         if (customer is null)
+        {
             return ServiceResult<Order>.Fail("找不到指定的客戶");
+        }
 
-        var validationError = ValidateLines(lines);
+        string? validationError = ValidateLines(lines);
         if (validationError is not null)
+        {
             return ServiceResult<Order>.Fail(validationError);
+        }
 
-        var errors = new List<string>();
-        var order = new Order
+        List<string> errors = new List<string>();
+        Order order = new Order
         {
             CustomerId = customer.Id,
             Status = OrderStatus.Pending,
             CreatedAt = DateTime.UtcNow
         };
 
-        foreach (var line in lines)
+        foreach (NewOrderLine line in lines)
         {
-            var product = await _productRepository.GetByIdAsync(line.ProductId);
+            Product? product = await _productRepository.GetByIdAsync(line.ProductId);
 
-            var lineError = ValidateOrderLine(product, line);
+            string? lineError = ValidateOrderLine(product, line);
             if (lineError is not null)
             {
                 errors.Add(lineError);
@@ -72,7 +84,9 @@ public class OrderService : IOrderService
         }
 
         if (errors.Count > 0)
+        {
             return ServiceResult<Order>.Fail(errors);
+        }
 
         await _orderRepository.AddAsync(order);
         await _orderRepository.SaveChangesAsync();
@@ -84,11 +98,20 @@ public class OrderService : IOrderService
     private static string? ValidateLines(IReadOnlyList<NewOrderLine> lines)
     {
         if (lines is null || lines.Count == 0)
+        {
             return "訂單至少需要一項商品";
+        }
+
         if (lines.Any(l => l.Quantity <= 0))
+        {
             return "商品數量必須大於 0";
+        }
+
         if (lines.Select(l => l.ProductId).Distinct().Count() != lines.Count)
+        {
             return "同一商品請勿重複加入，請調整數量即可";
+        }
+
         return null;
     }
 
@@ -96,29 +119,41 @@ public class OrderService : IOrderService
     private static string? ValidateOrderLine(Product? product, NewOrderLine line)
     {
         if (product is null || !product.IsActive)
+        {
             return $"商品（Id={line.ProductId}）不存在或已停售";
+        }
+
         if (product.StockQuantity < line.Quantity)
+        {
             return $"商品「{product.Name}」庫存不足（現有 {product.StockQuantity}，需求 {line.Quantity}）";
+        }
+
         return null;
     }
 
     public async Task<ServiceResult<Order>> CancelOrderAsync(int id)
     {
-        var order = await _orderRepository.GetWithDetailsAsync(id);
+        Order? order = await _orderRepository.GetWithDetailsAsync(id);
         if (order is null)
+        {
             return ServiceResult<Order>.Fail("找不到指定的訂單");
+        }
 
         if (order.Status != OrderStatus.Pending && order.Status != OrderStatus.Confirmed)
+        {
             return ServiceResult<Order>.Fail($"狀態為 {order.Status} 的訂單不可取消");
+        }
 
         order.Status = OrderStatus.Cancelled;
 
         // 取消訂單時回補庫存；上方守衛已保證只有 Pending/Confirmed 的訂單會走到這裡。
-        foreach (var item in order.Items)
+        foreach (OrderItem item in order.Items)
         {
-            var product = await _productRepository.GetByIdAsync(item.ProductId);
+            Product? product = await _productRepository.GetByIdAsync(item.ProductId);
             if (product is not null)
+            {
                 product.StockQuantity += item.Quantity;
+            }
         }
 
         await _orderRepository.SaveChangesAsync();
@@ -138,8 +173,8 @@ public class OrderService : IOrderService
 
     public decimal CalculateTotal(Order order)
     {
-        var tier = order.Customer?.Tier ?? CustomerTier.Standard;
-        var subtotal = CalculateSubtotal(order);
+        CustomerTier tier = order.Customer?.Tier ?? CustomerTier.Standard;
+        decimal subtotal = CalculateSubtotal(order);
         return Math.Round(subtotal * (1 - GetDiscountRate(tier)), 2);
     }
 }

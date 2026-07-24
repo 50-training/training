@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using OrderHub.Core.Domain;
 using OrderHub.Core.Services;
 using OrderHub.Web.ViewModels;
 
@@ -17,9 +18,9 @@ public class CustomersController : Controller
 
     public async Task<IActionResult> Index()
     {
-        var customers = await _customerService.GetAllAsync();
+        IReadOnlyList<Customer> customers = await _customerService.GetAllAsync();
 
-        var vm = new CustomerListViewModel
+        CustomerListViewModel vm = new CustomerListViewModel
         {
             Customers = customers.Select(c => new CustomerRowViewModel
             {
@@ -37,13 +38,15 @@ public class CustomersController : Controller
     [HttpGet("Customers/{id:int}/Orders")]
     public async Task<IActionResult> Orders(int id)
     {
-        var customer = await _customerService.GetByIdAsync(id);
+        Customer? customer = await _customerService.GetByIdAsync(id);
         if (customer is null)
+        {
             return NotFound();
+        }
 
-        var orders = await _orderService.GetCustomerOrdersAsync(id);
+        IReadOnlyList<Order> orders = await _orderService.GetCustomerOrdersAsync(id);
 
-        var vm = new CustomerOrdersViewModel
+        CustomerOrdersViewModel vm = new CustomerOrdersViewModel
         {
             CustomerId = customer.Id,
             CustomerName = customer.Name,

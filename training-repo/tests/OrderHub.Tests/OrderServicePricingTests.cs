@@ -1,4 +1,6 @@
 using OrderHub.Core.Domain;
+using OrderHub.Core.Services;
+using OrderHub.Infrastructure.Data;
 
 namespace OrderHub.Tests;
 
@@ -10,8 +12,8 @@ public class OrderServicePricingTests
     [InlineData(CustomerTier.Gold, 0.10)]
     public void GetDiscountRate_ReturnsExpectedRate(CustomerTier tier, decimal expected)
     {
-        using var db = TestSetup.CreateContext();
-        var service = TestSetup.CreateOrderService(db);
+        using OrderHubDbContext db = TestSetup.CreateContext();
+        OrderService service = TestSetup.CreateOrderService(db);
 
         Assert.Equal(expected, service.GetDiscountRate(tier));
     }
@@ -19,10 +21,10 @@ public class OrderServicePricingTests
     [Fact]
     public void CalculateSubtotal_SumsQuantityTimesSnapshotPrice()
     {
-        using var db = TestSetup.CreateContext();
-        var service = TestSetup.CreateOrderService(db);
+        using OrderHubDbContext db = TestSetup.CreateContext();
+        OrderService service = TestSetup.CreateOrderService(db);
 
-        var order = new Order
+        Order order = new Order
         {
             Items =
             {
@@ -40,10 +42,10 @@ public class OrderServicePricingTests
     [InlineData(CustomerTier.Gold, 1000, 900)]
     public void CalculateTotal_AppliesTierDiscountOnSubtotal(CustomerTier tier, decimal unitPrice, decimal expectedTotal)
     {
-        using var db = TestSetup.CreateContext();
-        var service = TestSetup.CreateOrderService(db);
+        using OrderHubDbContext db = TestSetup.CreateContext();
+        OrderService service = TestSetup.CreateOrderService(db);
 
-        var order = new Order
+        Order order = new Order
         {
             Customer = new Customer { Tier = tier },
             Items = { new OrderItem { Quantity = 1, UnitPriceSnapshot = unitPrice } }
@@ -55,10 +57,10 @@ public class OrderServicePricingTests
     [Fact]
     public void CalculateTotal_WithoutCustomer_UsesStandardRate()
     {
-        using var db = TestSetup.CreateContext();
-        var service = TestSetup.CreateOrderService(db);
+        using OrderHubDbContext db = TestSetup.CreateContext();
+        OrderService service = TestSetup.CreateOrderService(db);
 
-        var order = new Order
+        Order order = new Order
         {
             Items = { new OrderItem { Quantity = 2, UnitPriceSnapshot = 250m } }
         };

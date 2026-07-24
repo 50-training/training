@@ -18,17 +18,19 @@ public class OrderRepository : IOrderRepository
 
     public async Task<PagedResult<Order>> GetPagedAsync(int page, int pageSize, OrderStatus? status)
     {
-        var query = _db.Orders
+        IQueryable<Order> query = _db.Orders
             .Include(o => o.Customer)
             .Include(o => o.Items)
             .AsQueryable();
 
         if (status.HasValue)
+        {
             query = query.Where(o => o.Status == status.Value);
+        }
 
-        var totalCount = await query.CountAsync();
+        int totalCount = await query.CountAsync();
 
-        var items = await query
+        List<Order> items = await query
             .OrderByDescending(o => o.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)

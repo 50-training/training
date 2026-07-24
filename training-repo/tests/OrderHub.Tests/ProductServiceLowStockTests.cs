@@ -1,4 +1,6 @@
 using OrderHub.Core.Domain;
+using OrderHub.Core.Services;
+using OrderHub.Infrastructure.Data;
 
 namespace OrderHub.Tests;
 
@@ -7,14 +9,14 @@ public class ProductServiceLowStockTests
     [Fact]
     public async Task GetLowStock_FiltersByThreshold_AndSortsByStockAscending()
     {
-        using var db = TestSetup.CreateContext();
-        var service = TestSetup.CreateProductService(db);
+        using OrderHubDbContext db = TestSetup.CreateContext();
+        ProductService service = TestSetup.CreateProductService(db);
         TestSetup.AddProduct(db, stock: 8, sku: "SKU-LO8");
         TestSetup.AddProduct(db, stock: 2, sku: "SKU-LO2");
         TestSetup.AddProduct(db, stock: 10, sku: "SKU-EQ10"); // 邊界：等於門檻不納入
         TestSetup.AddProduct(db, stock: 15, sku: "SKU-HI15");
 
-        var result = await service.GetLowStockAsync(10);
+        IReadOnlyList<LowStockItem> result = await service.GetLowStockAsync(10);
 
         // 只保留 < 10 的兩筆，且依庫存升冪。
         Assert.Equal(2, result.Count);
@@ -26,12 +28,12 @@ public class ProductServiceLowStockTests
     [Fact]
     public async Task GetLowStock_SameStock_OrdersByUnitsSoldDescending()
     {
-        using var db = TestSetup.CreateContext();
-        var service = TestSetup.CreateProductService(db);
-        var customer = TestSetup.AddCustomer(db);
-        var productA = TestSetup.AddProduct(db, stock: 3, sku: "SKU-A"); // 售出 5
-        var productB = TestSetup.AddProduct(db, stock: 3, sku: "SKU-B"); // 售出 10
-        var now = DateTime.UtcNow;
+        using OrderHubDbContext db = TestSetup.CreateContext();
+        ProductService service = TestSetup.CreateProductService(db);
+        Customer customer = TestSetup.AddCustomer(db);
+        Product productA = TestSetup.AddProduct(db, stock: 3, sku: "SKU-A"); // 售出 5
+        Product productB = TestSetup.AddProduct(db, stock: 3, sku: "SKU-B"); // 售出 10
+        DateTime now = DateTime.UtcNow;
 
         db.Orders.AddRange(
             new Order
@@ -50,7 +52,7 @@ public class ProductServiceLowStockTests
             });
         db.SaveChanges();
 
-        var result = await service.GetLowStockAsync(10);
+        IReadOnlyList<LowStockItem> result = await service.GetLowStockAsync(10);
 
         // 庫存相同（皆 3），依近 30 天售出逆序：B(10) 在 A(5) 之前。
         Assert.Equal(new[] { "SKU-B", "SKU-A" }, result.Select(r => r.Sku));
@@ -59,13 +61,13 @@ public class ProductServiceLowStockTests
     [Fact]
     public async Task GetLowStock_ExcludesInactiveProducts()
     {
-        using var db = TestSetup.CreateContext();
-        var service = TestSetup.CreateProductService(db);
+        using OrderHubDbContext db = TestSetup.CreateContext();
+        ProductService service = TestSetup.CreateProductService(db);
         TestSetup.AddProduct(db, stock: 3, isActive: true, sku: "SKU-ACT");
         // 停售且庫存更低：若被誤納會排在最前面。
         TestSetup.AddProduct(db, stock: 1, isActive: false, sku: "SKU-INACT");
 
-        var result = await service.GetLowStockAsync(10);
+        IReadOnlyList<LowStockItem> result = await service.GetLowStockAsync(10);
 
         Assert.Single(result);
         Assert.Equal("SKU-ACT", result[0].Sku);
@@ -74,11 +76,11 @@ public class ProductServiceLowStockTests
     [Fact]
     public async Task GetLowStock_UnitsSold_ExcludesCancelledAndOlderThan30Days()
     {
-        using var db = TestSetup.CreateContext();
-        var service = TestSetup.CreateProductService(db);
-        var customer = TestSetup.AddCustomer(db);
-        var product = TestSetup.AddProduct(db, stock: 3, sku: "SKU-P");
-        var now = DateTime.UtcNow;
+        using OrderHubDbContext db = TestSetup.CreateContext();
+        ProductService service = TestSetup.CreateProductService(db);
+        Customer customer = TestSetup.AddCustomer(db);
+        Product product = TestSetup.AddProduct(db, stock: 3, sku: "SKU-P");
+        DateTime now = DateTime.UtcNow;
 
         db.Orders.AddRange(
             new Order
@@ -111,10 +113,10 @@ public class ProductServiceLowStockTests
             });
         db.SaveChanges();
 
-        var result = await service.GetLowStockAsync(10);
+        IReadOnlyList<LowStockItem> result = await service.GetLowStockAsync(10);
 
         // 只計入近 30 天且非 Cancelled：4 + 3 = 7（漏排 Cancelled 會變 107、漏排舊單變 57）。
-        var row = Assert.Single(result);
+        LowStockItem row = Assert.Single(result);
         Assert.Equal(7, row.UnitsSoldLast30Days);
     }
 }

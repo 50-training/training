@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using OrderHub.Core.Common;
 using OrderHub.Core.Domain;
 using OrderHub.Core.Services;
 using OrderHub.Web.Helpers;
@@ -27,9 +28,9 @@ public class OrdersController : Controller
 
     public async Task<IActionResult> Index(int page = 1, OrderStatus? status = null)
     {
-        var result = await _orderService.GetOrdersAsync(page, PageSize, status);
+        PagedResult<Order> result = await _orderService.GetOrdersAsync(page, PageSize, status);
 
-        var vm = new OrderListViewModel
+        OrderListViewModel vm = new OrderListViewModel
         {
             Orders = result.Items.Select(o => new OrderRowViewModel
             {
@@ -52,9 +53,11 @@ public class OrdersController : Controller
 
     public async Task<IActionResult> Details(int id)
     {
-        var order = await _orderService.GetOrderAsync(id);
+        Order? order = await _orderService.GetOrderAsync(id);
         if (order is null)
+        {
             return NotFound();
+        }
 
         return View(MapToDetails(order));
     }
@@ -62,7 +65,7 @@ public class OrdersController : Controller
     [HttpGet]
     public async Task<IActionResult> Create()
     {
-        var vm = new CreateOrderViewModel
+        CreateOrderViewModel vm = new CreateOrderViewModel
         {
             Lines = { new CreateOrderLineViewModel() }
         };
@@ -80,15 +83,17 @@ public class OrdersController : Controller
             return View(vm);
         }
 
-        var lines = vm.Lines
+        List<NewOrderLine> lines = vm.Lines
             .Select(l => new NewOrderLine(l.ProductId!.Value, l.Quantity))
             .ToList();
 
-        var result = await _orderService.CreateOrderAsync(vm.CustomerId!.Value, lines);
+        ServiceResult<Order> result = await _orderService.CreateOrderAsync(vm.CustomerId!.Value, lines);
         if (!result.Success)
         {
-            foreach (var error in result.Errors)
+            foreach (string error in result.Errors)
+            {
                 ModelState.AddModelError(string.Empty, error);
+            }
 
             await PopulateOptionsAsync(vm);
             return View(vm);
@@ -102,7 +107,7 @@ public class OrdersController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Cancel(int id)
     {
-        var result = await _orderService.CancelOrderAsync(id);
+        ServiceResult<Order> result = await _orderService.CancelOrderAsync(id);
         if (!result.Success)
         {
             TempData["Error"] = result.ErrorMessage;
@@ -115,8 +120,8 @@ public class OrdersController : Controller
 
     private async Task PopulateOptionsAsync(CreateOrderViewModel vm)
     {
-        var customers = await _customerService.GetAllAsync();
-        var products = await _productService.GetActiveAsync();
+        IReadOnlyList<Customer> customers = await _customerService.GetAllAsync();
+        IReadOnlyList<Product> products = await _productService.GetActiveAsync();
 
         vm.CustomerOptions = customers
             .Select(c => new SelectListItem(
@@ -133,9 +138,9 @@ public class OrdersController : Controller
 
     private OrderDetailsViewModel MapToDetails(Order order)
     {
-        var subtotal = _orderService.CalculateSubtotal(order);
-        var total = _orderService.CalculateTotal(order);
-        var tier = order.Customer?.Tier ?? CustomerTier.Standard;
+        decimal subtotal = _orderService.CalculateSubtotal(order);
+        decimal total = _orderService.CalculateTotal(order);
+        CustomerTier tier = order.Customer?.Tier ?? CustomerTier.Standard;
 
         return new OrderDetailsViewModel
         {

@@ -13,7 +13,7 @@ public static class TestSetup
 {
     public static OrderHubDbContext CreateContext()
     {
-        var options = new DbContextOptionsBuilder<OrderHubDbContext>()
+        DbContextOptions<OrderHubDbContext> options = new DbContextOptionsBuilder<OrderHubDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         return new OrderHubDbContext(options);
@@ -27,7 +27,7 @@ public static class TestSetup
 
     public static Customer AddCustomer(OrderHubDbContext db, CustomerTier tier = CustomerTier.Standard, string name = "測試客戶")
     {
-        var customer = new Customer
+        Customer customer = new Customer
         {
             Name = name,
             Email = "test@example.com.tw",
@@ -41,7 +41,7 @@ public static class TestSetup
 
     public static Product AddProduct(OrderHubDbContext db, decimal unitPrice = 100m, int stock = 50, bool isActive = true, string? sku = null)
     {
-        var product = new Product
+        Product product = new Product
         {
             Sku = sku ?? $"SKU-{Guid.NewGuid():N}"[..12],
             Name = "測試商品",

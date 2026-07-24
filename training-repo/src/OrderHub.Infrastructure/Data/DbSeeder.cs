@@ -40,16 +40,18 @@ public static class DbSeeder
     public static async Task SeedAsync(OrderHubDbContext db)
     {
         if (await db.Customers.AnyAsync())
+        {
             return;
+        }
 
-        var random = new Random(RandomSeed);
-        var now = DateTime.UtcNow;
+        Random random = new Random(RandomSeed);
+        DateTime now = DateTime.UtcNow;
 
         // --- Customers: 20 位（12 Standard / 5 Silver / 3 Gold） ---
-        var customers = new List<Customer>();
-        for (var i = 0; i < CustomerNames.Length; i++)
+        List<Customer> customers = new List<Customer>();
+        for (int i = 0; i < CustomerNames.Length; i++)
         {
-            var tier = GoldIndexes.Contains(i) ? CustomerTier.Gold
+            CustomerTier tier = GoldIndexes.Contains(i) ? CustomerTier.Gold
                 : SilverIndexes.Contains(i) ? CustomerTier.Silver
                 : CustomerTier.Standard;
 
@@ -64,11 +66,11 @@ public static class DbSeeder
         db.Customers.AddRange(customers);
 
         // --- Products: 50 個，其中 5 個低庫存（< 10） ---
-        var products = new List<Product>();
-        var skuNumber = 1001;
-        foreach (var series in ProductSeries)
+        List<Product> products = new List<Product>();
+        int skuNumber = 1001;
+        foreach (string series in ProductSeries)
         {
-            foreach (var baseName in ProductBaseNames)
+            foreach (string baseName in ProductBaseNames)
             {
                 products.Add(new Product
                 {
@@ -83,31 +85,35 @@ public static class DbSeeder
 
         // 指定 5 個商品為低庫存、3 個商品停售（低庫存與停售不重疊）
         int[] lowStockIndexes = { 4, 13, 22, 31, 47 };
-        foreach (var idx in lowStockIndexes)
+        foreach (int idx in lowStockIndexes)
+        {
             products[idx].StockQuantity = random.Next(2, 10);
+        }
 
         int[] inactiveIndexes = { 8, 26, 40 };
-        foreach (var idx in inactiveIndexes)
+        foreach (int idx in inactiveIndexes)
+        {
             products[idx].IsActive = false;
+        }
 
         db.Products.AddRange(products);
         await db.SaveChangesAsync();
 
         // --- Orders: 200 筆，近 90 天，各狀態都有 ---
-        var orders = new List<Order>();
-        for (var i = 0; i < 200; i++)
+        List<Order> orders = new List<Order>();
+        for (int i = 0; i < 200; i++)
         {
-            var customer = customers[random.Next(customers.Count)];
-            var order = new Order
+            Customer customer = customers[random.Next(customers.Count)];
+            Order order = new Order
             {
                 CustomerId = customer.Id,
                 Status = PickStatus(random),
                 CreatedAt = now.AddMinutes(-random.Next(30, 90 * 24 * 60))
             };
 
-            var lineCount = random.Next(1, 5);
-            var pickedProductIndexes = new HashSet<int>();
-            for (var j = 0; j < lineCount; j++)
+            int lineCount = random.Next(1, 5);
+            HashSet<int> pickedProductIndexes = new HashSet<int>();
+            for (int j = 0; j < lineCount; j++)
             {
                 int productIndex;
                 do
@@ -115,7 +121,7 @@ public static class DbSeeder
                     productIndex = random.Next(products.Count);
                 } while (!pickedProductIndexes.Add(productIndex));
 
-                var product = products[productIndex];
+                Product product = products[productIndex];
                 order.Items.Add(new OrderItem
                 {
                     ProductId = product.Id,
