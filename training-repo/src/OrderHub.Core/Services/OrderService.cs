@@ -100,14 +100,12 @@ public class OrderService : IOrderService
 
         order.Status = OrderStatus.Cancelled;
 
-        if (order.Status == OrderStatus.Pending || order.Status == OrderStatus.Confirmed)
+        // 取消訂單時回補庫存；上方守衛已保證只有 Pending/Confirmed 的訂單會走到這裡。
+        foreach (var item in order.Items)
         {
-            foreach (var item in order.Items)
-            {
-                var product = await _productRepository.GetByIdAsync(item.ProductId);
-                if (product is not null)
-                    product.StockQuantity += item.Quantity;
-            }
+            var product = await _productRepository.GetByIdAsync(item.ProductId);
+            if (product is not null)
+                product.StockQuantity += item.Quantity;
         }
 
         await _orderRepository.SaveChangesAsync();
