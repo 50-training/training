@@ -8,7 +8,13 @@ using OrderHub.Core.Services;
 using OrderHub.Infrastructure.Data;
 using OrderHub.Infrastructure.Repositories;
 
-HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
+// ContentRootPath 預設是呼叫端的工作目錄(例如 MCP client 的 cwd),
+// 而不是這個專案自己的輸出目錄,會導致讀不到旁邊的 appsettings.json,固定指向 AppContext.BaseDirectory
+HostApplicationBuilder builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+{
+    Args = args,
+    ContentRootPath = AppContext.BaseDirectory
+});
 
 // 重要:stdout 是 MCP 的協定通道,所有 log 一律走 stderr
 builder.Logging.AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace);
